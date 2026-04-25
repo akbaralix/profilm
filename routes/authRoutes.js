@@ -6,6 +6,12 @@ import authMiddleware from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || "profilm-secret";
+const allowedThemes = new Set([
+  "ocean-glass",
+  "dark-mode",
+  "white-mode",
+  "violet-classic",
+]);
 
 const sanitizeUser = (user) => ({
   id: user._id,
@@ -13,6 +19,7 @@ const sanitizeUser = (user) => ({
   email: user.email,
   bio: user.bio,
   profilePic: user.profilePic,
+  publicTheme: user.publicTheme,
   links: user.links,
 });
 
@@ -153,7 +160,7 @@ router.get("/me", authMiddleware, async (req, res) => {
 
 router.put("/me", authMiddleware, async (req, res) => {
   try {
-    const { username, bio, profilePic } = req.body;
+    const { username, bio, profilePic, publicTheme } = req.body;
 
     if (username && username.trim().length < 3) {
       return res.status(400).json({ message: "Username kamida 3 ta belgidan iborat bo'lsin." });
@@ -173,6 +180,14 @@ router.put("/me", authMiddleware, async (req, res) => {
 
     req.user.bio = bio?.trim() || "";
     req.user.profilePic = profilePic?.trim() || "";
+
+    if (publicTheme) {
+      if (!allowedThemes.has(publicTheme)) {
+        return res.status(400).json({ message: "Noto'g'ri profil andozasi tanlandi." });
+      }
+
+      req.user.publicTheme = publicTheme;
+    }
 
     await req.user.save();
 
@@ -263,7 +278,7 @@ router.get("/profile/:username", async (req, res) => {
   try {
     const user = await User.findOne({
       username: { $regex: `^${req.params.username}$`, $options: "i" },
-    }).select("username bio profilePic links");
+    }).select("username bio profilePic publicTheme links");
 
     if (!user) {
       return res.status(404).json({ message: "Foydalanuvchi topilmadi." });

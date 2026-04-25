@@ -50,6 +50,11 @@ const userSchema = new mongoose.Schema(
       default: "",
       trim: true,
     },
+    publicTheme: {
+      type: String,
+      enum: ["ocean-glass", "dark-mode", "white-mode", "violet-classic"],
+      default: "ocean-glass",
+    },
     googleId: {
       type: String,
       default: "",
