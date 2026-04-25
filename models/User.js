@@ -1,3 +1,4 @@
+import { type } from "firebase/firestore/pipelines";
 import mongoose from "mongoose";
 
 const linkSchema = new mongoose.Schema(
@@ -16,6 +17,11 @@ const linkSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    cliked: {
+      type: Number,
+      required: true,
+      default: 0,
+    },
   },
   { _id: true },
 );
@@ -32,6 +38,12 @@ const userSchema = new mongoose.Schema(
     password: {
       type: String,
       required: true,
+    },
+    name: {
+      type: String,
+      required: false,
+      default: "",
+      trim: true,
     },
     email: {
       type: String,
