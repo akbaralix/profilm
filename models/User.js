@@ -1,4 +1,3 @@
-import { type } from "firebase/firestore/pipelines";
 import mongoose from "mongoose";
 
 const linkSchema = new mongoose.Schema(
@@ -17,7 +16,7 @@ const linkSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
-    cliked: {
+    clicked: {
       type: Number,
       required: true,
       default: 0,

@@ -246,7 +246,7 @@ router.post("/me/links", authMiddleware, async (req, res) => {
         .json({ message: "Link uchun title va url kerak." });
     }
 
-    req.user.links.push({ title, url, type });
+    req.user.links.push({ title, url, type, clicked: 0 });
     await req.user.save();
 
     return res.status(201).json({
@@ -271,6 +271,7 @@ router.put("/me/links/:linkId", authMiddleware, async (req, res) => {
     const title = req.body.title?.trim();
     const url = req.body.url?.trim();
     const type = req.body.type?.trim() || "custom";
+    const clicked = req.body.clicked ?? 0;
 
     if (!title || !url) {
       return res
@@ -281,6 +282,7 @@ router.put("/me/links/:linkId", authMiddleware, async (req, res) => {
     link.title = title;
     link.url = url;
     link.type = type;
+    link.clicked = clicked;
 
     await req.user.save();
 
@@ -292,6 +294,21 @@ router.put("/me/links/:linkId", authMiddleware, async (req, res) => {
     return res
       .status(500)
       .json({ message: "Linkni yangilashda xatolik yuz berdi." });
+  }
+});
+
+router.post("/public/:username/links/:linkId/click", async (req, res) => {
+  try {
+    const { username, linkId } = req.params;
+
+    await User.updateOne(
+      { username, "links._id": linkId },
+      { $inc: { "links.$.clicked": 1 } },
+    );
+
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: "Xatolik yuz berdi" });
   }
 });
 
