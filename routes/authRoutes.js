@@ -22,6 +22,7 @@ const sanitizeUser = (user) => ({
   profilePic: user.profilePic,
   publicTheme: user.publicTheme,
   links: user.links,
+  seen: user.seen,
 });
 
 const createToken = (user) =>
@@ -349,6 +350,40 @@ router.get("/profile/:username", async (req, res) => {
     return res
       .status(500)
       .json({ message: "Public profilni olishda xatolik yuz berdi." });
+  }
+});
+const cache = new Map();
+
+router.post("/profile/:username/seen", async (req, res) => {
+  try {
+    const username = req.params.username;
+    const ip = req.ip;
+
+    const key = `${ip}_${username}`;
+    const now = Date.now();
+
+    const last = cache.get(key);
+
+    if (last && now - last < 24 * 60 * 60 * 1000) {
+      return res.json({ skipped: true });
+    }
+
+    cache.set(key, now);
+
+    const user = await User.findOneAndUpdate(
+      { username: { $regex: `^${username}$`, $options: "i" } },
+      { $inc: { seen: 1 } },
+      { returnDocument: "after" },
+    );
+
+    if (!user) {
+      return res.status(404).json({ message: "Foydalanuvchi topilmadi." });
+    }
+
+    return res.json({ seen: user.seen });
+  } catch (err) {
+    console.log(err);
+    return res.status(500).json({ message: "Xatolik yuz berdi" });
   }
 });
 

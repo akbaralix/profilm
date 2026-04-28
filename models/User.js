@@ -75,6 +75,10 @@ const userSchema = new mongoose.Schema(
       type: [linkSchema],
       default: [],
     },
+    seen: {
+      type: Number,
+      default: 0,
+    },
   },
   { timestamps: true },
 );
