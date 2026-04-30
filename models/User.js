@@ -21,6 +21,10 @@ const linkSchema = new mongoose.Schema(
       required: true,
       default: 0,
     },
+    enabled: {
+      type: Boolean,
+      default: true,
+    },
   },
   { _id: true },
 );

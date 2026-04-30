@@ -25,10 +25,29 @@ const sanitizeUser = (user) => ({
   seen: user.seen,
 });
 
+const normalizePublicLinks = (links = []) =>
+  links.filter((link) => link.enabled !== false);
+
 const createToken = (user) =>
   jwt.sign({ id: user._id, username: user.username }, JWT_SECRET, {
     expiresIn: "7d",
   });
+
+const getOptionalViewerUsername = (req) => {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader?.startsWith("Bearer ")) {
+    return null;
+  }
+
+  try {
+    const token = authHeader.split(" ")[1];
+    const decoded = jwt.verify(token, JWT_SECRET);
+    return decoded.username?.toLowerCase() || null;
+  } catch {
+    return null;
+  }
+};
 
 router.get("/username-available/:username", async (req, res) => {
   try {
@@ -240,6 +259,7 @@ router.post("/me/links", authMiddleware, async (req, res) => {
     const title = req.body.title?.trim();
     const url = req.body.url?.trim();
     const type = req.body.type?.trim() || "custom";
+    const enabled = req.body.enabled ?? true;
 
     if (!title || !url) {
       return res
@@ -247,7 +267,7 @@ router.post("/me/links", authMiddleware, async (req, res) => {
         .json({ message: "Link uchun title va url kerak." });
     }
 
-    req.user.links.push({ title, url, type, clicked: 0 });
+    req.user.links.push({ title, url, type, clicked: 0, enabled });
     await req.user.save();
 
     return res.status(201).json({
@@ -273,6 +293,7 @@ router.put("/me/links/:linkId", authMiddleware, async (req, res) => {
     const url = req.body.url?.trim();
     const type = req.body.type?.trim() || "custom";
     const clicked = req.body.clicked ?? 0;
+    const enabled = req.body.enabled ?? true;
 
     if (!title || !url) {
       return res
@@ -284,6 +305,7 @@ router.put("/me/links/:linkId", authMiddleware, async (req, res) => {
     link.url = url;
     link.type = type;
     link.clicked = clicked;
+    link.enabled = enabled;
 
     await req.user.save();
 
@@ -301,9 +323,22 @@ router.put("/me/links/:linkId", authMiddleware, async (req, res) => {
 router.post("/public/:username/links/:linkId/click", async (req, res) => {
   try {
     const { username, linkId } = req.params;
+    const viewerUsername = getOptionalViewerUsername(req);
+
+    if (viewerUsername && viewerUsername === username?.toLowerCase()) {
+      return res.json({ success: true, skipped: true, reason: "self-click" });
+    }
 
     await User.updateOne(
-      { username, "links._id": linkId },
+      {
+        username: { $regex: `^${username}$`, $options: "i" },
+        links: {
+          $elemMatch: {
+            _id: linkId,
+            enabled: { $ne: false },
+          },
+        },
+      },
       { $inc: { "links.$.clicked": 1 } },
     );
 
@@ -345,7 +380,12 @@ router.get("/profile/:username", async (req, res) => {
       return res.status(404).json({ message: "Foydalanuvchi topilmadi." });
     }
 
-    return res.json({ user });
+    return res.json({
+      user: {
+        ...user.toObject(),
+        links: normalizePublicLinks(user.links),
+      },
+    });
   } catch (err) {
     return res
       .status(500)
@@ -356,7 +396,13 @@ const cache = new Map();
 
 router.post("/profile/:username/seen", async (req, res) => {
   try {
-    const username = req.params.username;
+    const username = req.params.username?.trim();
+    const viewerUsername = getOptionalViewerUsername(req);
+
+    if (viewerUsername && viewerUsername === username?.toLowerCase()) {
+      return res.json({ skipped: true, reason: "self-view" });
+    }
+
     const ip = req.ip;
 
     const key = `${ip}_${username}`;
