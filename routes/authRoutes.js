@@ -398,14 +398,21 @@ router.post("/profile/:username/seen", async (req, res) => {
   try {
     const username = req.params.username?.trim();
     const viewerUsername = getOptionalViewerUsername(req);
+    const normalizedUsername = username?.toLowerCase();
 
-    if (viewerUsername && viewerUsername === username?.toLowerCase()) {
+    if (!normalizedUsername) {
+      return res.status(400).json({ message: "Username kerak." });
+    }
+
+    if (viewerUsername && viewerUsername === normalizedUsername) {
       return res.json({ skipped: true, reason: "self-view" });
     }
 
     const ip = req.ip;
+    const userAgent = req.get("user-agent") || "unknown";
+    const viewerKey = viewerUsername || `${ip}_${userAgent}`;
 
-    const key = `${ip}_${username}`;
+    const key = `${viewerKey}_${normalizedUsername}`;
     const now = Date.now();
 
     const last = cache.get(key);
@@ -417,7 +424,7 @@ router.post("/profile/:username/seen", async (req, res) => {
     cache.set(key, now);
 
     const user = await User.findOneAndUpdate(
-      { username: { $regex: `^${username}$`, $options: "i" } },
+      { username: { $regex: `^${normalizedUsername}$`, $options: "i" } },
       { $inc: { seen: 1 } },
       { returnDocument: "after" },
     );
